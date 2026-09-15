@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.env
+data/
+workspace/*
+!workspace/README.md
+.DS_Store
+.venv/
