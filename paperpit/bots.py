@@ -31,6 +31,14 @@ HOT_FUNDING = 0.0005           # 0.05% per 8h
 BREAKOUT_LOOKBACK = 20
 VOLUME_SPIKE = 1.4
 
+# Runtime switches, so the same session can be replayed with the seats loosened.
+SETTINGS = {
+    "devil": True,                      # False: DEVIL stops killing anything
+    "max_fills": MAX_FILLS_PER_SESSION,
+    "max_open": MAX_OPEN_POSITIONS,
+    "cooldown": EXIT_COOLDOWN_BARS,
+}
+
 
 @dataclass
 class Series:
@@ -109,6 +117,9 @@ def wire(idea: dict, rates: list[tuple[int, float]]) -> dict:
 # --------------------------------------------------------------------------- DEVIL
 def devil(idea: dict, state: dict, ask_grok=None) -> tuple[bool, str]:
     """Argue against the setup. Returns (killed, reason)."""
+    if not SETTINGS["devil"]:
+        return False, ""
+
     objections: list[str] = []
 
     if idea["side"] == "long" and not idea["trend_up"]:
@@ -179,12 +190,12 @@ def veto(ticket: dict, state: dict, ask_grok=None) -> tuple[bool, str]:
     """The safety seat. It can only say no. Returns (blocked, reason)."""
     if state["day_pnl"] <= -DAILY_LOSS_LIMIT * state["day_start_equity"]:
         return True, "daily loss limit reached, desk is closed for the day"
-    if state["day_fills"] >= MAX_FILLS_PER_SESSION:
-        return True, f"session limit: {MAX_FILLS_PER_SESSION} trades is the whole day"
-    if len(state["open"]) >= MAX_OPEN_POSITIONS:
-        return True, "already carrying a position"
+    if state["day_fills"] >= SETTINGS["max_fills"]:
+        return True, f"session limit: {SETTINGS['max_fills']} trades is the whole day"
+    if len(state["open"]) >= SETTINGS["max_open"]:
+        return True, f"already carrying {len(state['open'])} position(s)"
     last_exit = state.get("last_exit_bar")
-    if last_exit is not None and ticket["bar"] - last_exit < EXIT_COOLDOWN_BARS:
+    if last_exit is not None and ticket["bar"] - last_exit < SETTINGS["cooldown"]:
         return True, "cooldown: the last trade only just closed"
     if any(p["symbol"] == ticket["symbol"] for p in state["open"]):
         return True, "already in this symbol"

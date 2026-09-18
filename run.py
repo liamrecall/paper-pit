@@ -12,7 +12,8 @@ import argparse
 import os
 from pathlib import Path
 
-from paperpit import grok
+from paperpit import bots, grok
+from paperpit.pit import day_ranges, load_desk, new_state, run_day, write_workspace
 
 
 def load_env(path: Path = Path(__file__).with_name(".env")) -> None:
@@ -26,7 +27,7 @@ def load_env(path: Path = Path(__file__).with_name(".env")) -> None:
         key, value = line.split("=", 1)
         if value.strip():
             os.environ.setdefault(key.strip(), value.strip())
-from paperpit.pit import day_ranges, load_desk, new_state, run_day, write_workspace
+
 
 DEFAULT_SYMBOLS = "BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,ADAUSDT,AVAXUSDT,LINKUSDT,TONUSDT,SUIUSDT"
 
@@ -40,7 +41,18 @@ def main() -> None:
     parser.add_argument("--interval", default="5m", choices=["1m", "5m", "15m", "30m", "1h", "4h"])
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--grok", action="store_true", help="let Grok review as a second opinion")
+    parser.add_argument("--no-devil", action="store_true", help="replay the session with DEVIL switched off")
+    parser.add_argument("--max-fills", type=int, help="trades allowed per session")
+    parser.add_argument("--max-open", type=int, help="positions the desk may carry at once")
+    parser.add_argument("--cooldown", type=int, help="bars to wait after a trade closes")
     args = parser.parse_args()
+
+    if args.no_devil:
+        bots.SETTINGS["devil"] = False
+    for key in ("max_fills", "max_open", "cooldown"):
+        value = getattr(args, key)
+        if value is not None:
+            bots.SETTINGS[key] = value
 
     symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
     series_map, rates_map, source, total_bars = load_desk(symbols, args.days, args.interval, args.offline)
